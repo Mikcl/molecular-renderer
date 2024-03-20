@@ -5,8 +5,50 @@ import HDL
 import MM4
 import Numerics
 
+struct Methane {
+    var atoms: [Entity] = []
+
+    // The angle between hydrogen atoms in a tetrahedral structure.
+    let bondAngle: Float = 109.5 * .pi / 180
+
+    init() {
+        let carbonPosition: SIMD3<Float> = .zero
+        // Bond length (Å / 10 for C-H in methane.
+        let carbonHydrogenBondLength: Float = 1.087 / 10
+
+        // Define positions for hydrogen atoms around carbon atom.
+        let hydrogenPositions: [SIMD3<Float>] = [
+            SIMD3(1, 1, 1),
+            SIMD3(-1, -1, 1),
+            SIMD3(-1, 1, -1),
+            SIMD3(1, -1, -1)
+        ]
+
+        // Adjust positions based on bond length and angle.
+        var adjustedHydrogenPositions = hydrogenPositions.map { position in
+          let x = position.x * cos(bondAngle) - position.y * sin(bondAngle)
+          let y = position.x * sin(bondAngle) + position.y * cos(bondAngle)
+          let z = position.z
+          return SIMD3(x, y, z) * carbonHydrogenBondLength
+        }
+
+
+        // Create atoms from the generated positions.
+        let carbon = Entity(position: carbonPosition, type: .atom(.carbon))
+        let hydrogens = adjustedHydrogenPositions.map { position in
+            Entity(position: position, type: .atom(.hydrogen))
+        }
+
+        // Add carbon and hydrogen atoms to the array of atoms.
+        atoms.append(carbon)
+        atoms.append(contentsOf: hydrogens)
+    }
+}
+
+
 func createGeometry() -> [[Entity]] {
   // MARK: - Scene Setup
+  // Methane, no simulation.
   
   // Methylene
   // - endSeparation = 0.35
@@ -20,16 +62,17 @@ func createGeometry() -> [[Entity]] {
   // - endSeparation = 0.35
   
   // Speed is in kilometers per second.
-  let speed: Float = 1
-  let endSeparation: Float = 0.35
-  let framesStationary: Int = 100
-  let framesTotal: Int = 500
+  // let speed: Float = 1
+  // let endSeparation: Float = 0.35
+  // let framesStationary: Int = 100
+  let framesTotal: Int = 0
   
-  let simulating: Bool = true
+  // let simulating: Bool = true
   let uhf: Int = 0
   
   // Make the tooltip approach from above. Orient the molecules vertically
   // instead of horizontally.
+  /*
   let azimuthTilt = Quaternion<Float>(angle: 90 * .pi / 180, axis: [0, 1, 0])
   let startSeparation = endSeparation + 100 * 0.002 * speed
   
@@ -59,13 +102,16 @@ func createGeometry() -> [[Entity]] {
     atom.position = azimuthTilt.act(on: atom.position)
     workpiece.topology.atoms[i] = atom
   }
-  
+  */
   // MARK: - Simulation Setup
   
   XTBLibrary.loadLibrary(
     path: "/opt/homebrew/Cellar/xtb/6.6.1/lib/libxtb.6.dylib")
   
-  let initialAtoms = tooltip.topology.atoms + workpiece.topology.atoms
+  var methane = Methane()
+
+  // let initialAtoms = tooltip.topology.atoms + workpiece.topology.atoms
+  let initialAtoms = methane.atoms
   let env = xtb_newEnvironment()!
   let calc = xtb_newCalculator()!
   let res = xtb_newResults()!
@@ -81,19 +127,21 @@ func createGeometry() -> [[Entity]] {
     fatalError("Environment is bad.")
   }
   
+  /*
   var tooltipBulkVelocity = SIMD3<Float>(0, -speed, 0)
   var tooltipAtomVelocities = [SIMD3<Float>](
     repeating: tooltipBulkVelocity, count: tooltip.topology.atoms.count)
   var workpieceAtomVelocities = [SIMD3<Float>](
     repeating: .zero, count: workpiece.topology.atoms.count)
+  */
   
   var output: [[Entity]] = []
-  var movingBackward: Bool = false
+  // var movingBackward: Bool = false
   var stationaryStartFrame: Int = -1
   
   for frameID in 0...framesTotal {
     print("\nframe", frameID, terminator: " ")
-    
+    /*
     if frameID > 0 {
       var forces: [SIMD3<Float>] = []
       var masses: [Float] = []
@@ -194,11 +242,13 @@ func createGeometry() -> [[Entity]] {
     }
     
     output.append(tooltip.topology.atoms + workpiece.topology.atoms)
+    */
+    output.append(methane.atoms)
   }
   print()
   
-  let serialized = try! XTBProcess.encodeAtoms(tooltip.topology.atoms + workpiece.topology.atoms, encoding: .hdl)
-  print(serialized)
+  // let serialized = try! XTBProcess.encodeAtoms(tooltip.topology.atoms + workpiece.topology.atoms, encoding: .hdl)
+  // print(serialized)
   print()
   
   return output
